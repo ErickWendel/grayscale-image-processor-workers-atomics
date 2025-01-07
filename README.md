@@ -1,4 +1,6 @@
-# **Grayscale Image Processor with Atomics**
+# **Grayscale Image Processor with JS Atomics**
+
+![demo](./demo.png)
 
 This project demonstrates how to process an image in the browser using **Web Workers** and the **Atomics API** with a **SharedArrayBuffer**. The application applies a grayscale filter to an image, utilizing parallel processing for improved performance and efficient memory handling.
 
