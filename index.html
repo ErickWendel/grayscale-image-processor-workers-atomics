@@ -10,115 +10,31 @@
 
 <body>
     <div class="container">
-        <h1>Workers and Atomics </h1>
-        <input type="file" id="upload" accept="image/*">
+        <h1>Workers and Atomics</h1>
+        <div class="description">
+            <p>Upload an image to process it using Web Workers and SharedArrayBuffer with Atomics API</p>
+            <p>The image will be converted to grayscale using parallel processing</p>
+        </div>
+
+        <div class="controls">
+            <input type="file" id="upload" accept="image/*" class="file-input">
+            <div class="status" id="status"></div>
+        </div>
+
         <div class="canvas-container">
-            <canvas id="original" class="canvas"></canvas>
-            <canvas id="processed" class="canvas"></canvas>
+            <div class="canvas-wrapper">
+                <h2>Original Image</h2>
+                <canvas id="original" class="canvas"></canvas>
+            </div>
+            <div class="canvas-wrapper">
+                <h2>Processed Image</h2>
+                <canvas id="processed" class="canvas"></canvas>
+            </div>
         </div>
     </div>
-    <script>
-        const numWorkers = 4;
 
-        function processImage(src) {
-            const img = new Image();
-            img.crossOrigin = "Anonymous"; // Handles CORS
-            img.src = src;
-
-            img.onload = () => {
-                const canvas = document.getElementById('original');
-                const ctx = canvas.getContext('2d');
-                canvas.width = img.width;
-                canvas.height = img.height;
-
-                // Draw image on the canvas
-                ctx.drawImage(img, 0, 0);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-                // Create SharedArrayBuffer with space for the 'done' counter
-                const bufferLength = imageData.data.length + Int32Array.BYTES_PER_ELEMENT;
-                const sharedBuffer = new SharedArrayBuffer(bufferLength);
-                const sharedPixels = new Uint8ClampedArray(sharedBuffer, 0, imageData.data.length);
-                const done = new Int32Array(sharedBuffer, imageData.data.length, 1);
-
-                sharedPixels.set(imageData.data); // Copy image data
-
-                // Create workers
-                const workers = [];
-                const chunkSize = Math.floor(sharedPixels.length / numWorkers);
-                for (let i = 0; i < numWorkers; i++) {
-                    const worker = new Worker(
-                        // this could be a separate file
-                        URL.createObjectURL(
-                            new Blob([
-                                `
-                                self.onmessage = function(event) {
-                                    const { buffer, start, end } = event.data;
-                                    const pixels = new Uint8ClampedArray(buffer, 0, ${imageData.data.length});
-                                    const done = new Int32Array(buffer, ${imageData.data.length}, 1);
-
-                                    console.log("Worker processing:", start, end);
-                                    for (let i = start; i < end; i += 4) {
-                                        const r = pixels[i];
-                                        const g = pixels[i + 1];
-                                        const b = pixels[i + 2];
-                                        const avg = (r + g + b) / 3;
-                                        pixels[i] = avg; // Red
-                                        pixels[i + 1] = avg; // Green
-                                        pixels[i + 2] = avg; // Blue
-                                    }
-
-                                    Atomics.add(done, 0, 1);
-                                    console.log("Worker completed:", start, end, "Counter:", Atomics.load(done, 0));
-                                };
-                                `,
-                            ])
-                        )
-                    );
-                    workers.push(worker);
-
-                    const start = i * chunkSize;
-                    const end = i === numWorkers - 1 ? sharedPixels.length : start + chunkSize;
-
-                    // Send data to the worker
-                    worker.postMessage({ buffer: sharedBuffer, start, end });
-                }
-
-                // Monitor worker completion
-                const checkCompletion = () => {
-                    const completed = Atomics.load(done, 0);
-                    console.log("Number of workers finished:", completed);
-
-                    if (completed === numWorkers) {
-                        // Update canvas with processed image
-                        const canvas = document.getElementById('processed');
-                        const ctx = canvas.getContext('2d');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-
-                        ctx.drawImage(img, 0, 0);
-                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-                        imageData.data.set(sharedPixels);
-                        ctx.putImageData(imageData, 0, 0);
-                        console.log("Done!");
-                    } else {
-                        setTimeout(checkCompletion, 50);
-                    }
-                };
-                checkCompletion();
-            };
-        }
-
-        // Handle file upload
-        document.getElementById('upload').addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                const src = URL.createObjectURL(file);
-                processImage(src);
-            }
-        });
-    </script>
+    <!-- Use ES modules for better code organization -->
+    <script type="module" src="src/app.js"></script>
 </body>
 
 </html>
