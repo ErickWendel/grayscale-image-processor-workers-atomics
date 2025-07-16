@@ -1,6 +1,18 @@
+import { WorkerCoordinator } from './WorkerCoordinator.js';
+import { ProgressView } from '../components/ProgressView.js';
+
+/**
+ * ImageProcessor - Refactored implementation using SharedArrayBuffer and Atomics API
+ *
+ * This implementation follows the Single Responsibility Principle:
+ * - ImageProcessor: Handles the high-level image processing workflow
+ * - WorkerCoordinator: Manages workers and thread synchronization
+ * - ProgressView: Handles UI updates and progress visualization
+ */
 export class ImageProcessor {
     constructor(numWorkers = 4) {
         this.numWorkers = numWorkers;
+        this.progressView = new ProgressView();
     }
 
     async processImage(imageData) {
@@ -8,72 +20,115 @@ export class ImageProcessor {
             const { data, width, height } = imageData;
 
             // Update status
-            const statusEl = document.getElementById('status');
-            statusEl.textContent = 'Preparing image data...';
+            this.progressView.updateStatus('Preparing image data...');
 
-            // Create SharedArrayBuffer with space for the 'done' counter
-            const bufferLength = data.length + Int32Array.BYTES_PER_ELEMENT;
-            const sharedBuffer = new SharedArrayBuffer(bufferLength);
-            const sharedPixels = new Uint8ClampedArray(sharedBuffer, 0, data.length);
-            const done = new Int32Array(sharedBuffer, data.length, 1);
+            // Create progress UI
+            this.progressView.createProgressUI(this.numWorkers);
 
-            // Copy image data to shared buffer
+            // Create a single SharedArrayBuffer for the entire image
+            // This avoids unnecessary memory copying between main thread and workers
+            const imageBufferSize = data.length;
+            const sharedImageBuffer = new SharedArrayBuffer(imageBufferSize);
+            const sharedPixels = new Uint8ClampedArray(sharedImageBuffer);
+
+            // Copy the original image data to the shared buffer (one-time copy)
             sharedPixels.set(data);
 
-            // Create workers
-            const workers = [];
-            const chunkSize = Math.floor(sharedPixels.length / this.numWorkers);
+            // Create a SharedArrayBuffer for coordination and synchronization
+            // Index 0: Total completed workers counter
+            // Index 1: Main thread notification flag
+            // Index 2: Barrier synchronization counter
+            // Index 3-7: Reserved for future use
+            // Index 8+: Individual worker progress (one slot per worker)
+            const controlBufferSize = 8 + this.numWorkers;
+            const controlBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * controlBufferSize);
+            const control = new Int32Array(controlBuffer);
 
-            // Update status to show we're starting workers
-            statusEl.textContent = `Starting ${this.numWorkers} workers...`;
+            // Create a worker coordinator to manage the workers
+            const coordinator = new WorkerCoordinator(
+                this.numWorkers,
+                // Progress update callback
+                (type, workerId, percent) => {
+                    if (type === 'worker') {
+                        this.progressView.updateWorkerProgress(workerId, percent);
+                    } else if (type === 'total') {
+                        this.progressView.updateTotalProgress(percent);
+                        this.progressView.updateStatus(`Processing: ${percent}% complete`);
+                    }
+                },
+                // Completion callback - mark as resolved to prevent fallback from running
+                () => {
+                    isResolved = true; // Prevent fallback from running
+                    this.progressView.updateStatus('Creating final image...');
 
-            for (let i = 0; i < this.numWorkers; i++) {
-                const worker = new Worker('/src/workers/imageWorker.js');
-                workers.push(worker);
-
-                const start = i * chunkSize;
-                const end = i === this.numWorkers - 1 ? sharedPixels.length : start + chunkSize;
-
-                // Send data to the worker
-                worker.postMessage({
-                    buffer: sharedBuffer,
-                    start,
-                    end,
-                    imageDataLength: data.length
-                });
-            }
-
-            // Update status
-            statusEl.textContent = `Processing with ${this.numWorkers} workers...`;
-
-            // Monitor worker completion
-            const checkCompletion = () => {
-                const completed = Atomics.load(done, 0);
-                console.log("Number of workers finished:", completed);
-
-                // Update status with progress
-                statusEl.textContent = `Processing: ${completed}/${this.numWorkers} workers complete`;
-
-                if (completed === this.numWorkers) {
-                    // Create new ImageData with processed pixels
-                    const processedData = new ImageData(
+                    // Create the final ImageData directly from the shared buffer
+                    const finalData = new ImageData(
                         new Uint8ClampedArray(sharedPixels),
                         width,
                         height
                     );
 
-                    // Terminate workers
-                    workers.forEach(worker => worker.terminate());
+                    // Clean up
+                    coordinator.terminateWorkers();
 
-                    statusEl.textContent = 'Finalizing image...';
-                    resolve(processedData);
-                    console.log("Processing complete!");
+                    // Resolve with the processed image data
+                    this.progressView.updateStatus('Processing complete!');
+                    // Hide the progress bars when done
+                    this.progressView.hideProgress();
+                    resolve(finalData);
+                    console.log("Processing complete via coordinator callback!");
+                }
+            );
+
+            // Update status
+            this.progressView.updateStatus(`Starting ${this.numWorkers} workers...`);
+
+            // Create and start workers
+            coordinator.createWorkers(sharedImageBuffer, controlBuffer, imageData);
+
+            // Start the progress monitor
+            coordinator.startProgressMonitor(controlBuffer);
+
+            // Update status
+            this.progressView.updateStatus(`Processing with ${this.numWorkers} workers...`);
+
+            // Flag to track whether the completion has been handled
+            // This prevents both the normal and fallback paths from executing
+            let isResolved = false;
+            const fallbackChecker = () => {
+                if (isResolved) return;
+
+                // Check if all workers are done
+                const completed = Atomics.load(control, 0);
+
+                if (completed === this.numWorkers) {
+                    isResolved = true;
+                    this.progressView.updateStatus('Creating final image (fallback)...');
+
+                    // Create the final ImageData
+                    const finalData = new ImageData(
+                        new Uint8ClampedArray(sharedPixels),
+                        width,
+                        height
+                    );
+
+                    // Clean up
+                    coordinator.terminateWorkers();
+
+                    // Resolve with the processed image data
+                    this.progressView.updateStatus('Processing complete! (fallback)');
+                    // Hide the progress bars when done
+                    this.progressView.hideProgress();
+                    resolve(finalData);
                 } else {
-                    setTimeout(checkCompletion, 50);
+                    // Continue checking
+                    setTimeout(fallbackChecker, 500);
                 }
             };
 
-            checkCompletion();
+            // Start fallback checker with a longer initial delay
+            // to give the primary mechanism more time to work
+            setTimeout(fallbackChecker, 2000);
         });
     }
 }

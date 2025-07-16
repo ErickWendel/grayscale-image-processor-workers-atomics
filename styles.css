@@ -55,6 +55,22 @@ h2 {
     margin-right: auto;
 }
 
+.features-list {
+    margin-top: 15px;
+    font-size: 0.9rem;
+}
+
+.feature {
+    display: inline-block;
+    background-color: var(--secondary-color);
+    color: var(--text-light);
+    padding: 3px 8px;
+    margin: 2px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
 .controls {
     margin: 30px 0;
     display: flex;
@@ -83,6 +99,74 @@ h2 {
     height: 30px;
     font-weight: bold;
     color: var(--primary-color);
+}
+
+/* Progress bars styling */
+.progress-container {
+    margin: 20px 0;
+    width: 100%;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 15px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+}
+
+.worker-progress {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+}
+
+.progress-label {
+    width: 80px;
+    text-align: right;
+    margin-right: 10px;
+    font-size: 14px;
+    color: var(--secondary-color);
+    font-weight: 500;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 12px;
+    background-color: #eee;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: var(--primary-color);
+    transition: width 0.3s ease;
+    width: 0%;
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.total-progress .progress-fill {
+    background-color: #2ecc71;
+}
+
+.progress-text {
+    width: 50px;
+    margin-left: 10px;
+    font-size: 14px;
+    text-align: left;
+}
+
+.total-progress {
+    margin-top: 15px;
+    border-top: 1px solid #ddd;
+    padding-top: 10px;
+}
+
+.total-progress .progress-label {
+    font-weight: bold;
 }
 
 .canvas-container {

@@ -13,12 +13,73 @@
         <h1>Workers and Atomics</h1>
         <div class="description">
             <p>Upload an image to process it using Web Workers and SharedArrayBuffer with Atomics API</p>
-            <p>The image will be converted to grayscale using parallel processing</p>
+            <p>The image will be converted to grayscale using advanced parallel processing</p>
+            <p class="features-list">
+                <strong>Features:</strong>
+                <span class="feature">SharedArrayBuffer</span>
+                <span class="feature">Atomics.add</span>
+                <span class="feature">Atomics.load</span>
+                <span class="feature">Atomics.wait</span>
+                <span class="feature">Atomics.notify</span>
+            </p>
         </div>
 
         <div class="controls">
             <input type="file" id="upload" accept="image/*" class="file-input">
             <div class="status" id="status"></div>
+
+            <!-- Progress container - initially hidden -->
+            <div id="progress-container" class="progress-container" style="display: none;">
+                <!-- Worker progress bars -->
+                <div id="worker-progress-container">
+                    <!-- Worker 1 -->
+                    <div class="worker-progress">
+                        <div class="progress-label">Worker 1</div>
+                        <div class="progress-bar">
+                            <div id="progress-fill-0" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div id="progress-text-0" class="progress-text">0%</div>
+                    </div>
+
+                    <!-- Worker 2 -->
+                    <div class="worker-progress">
+                        <div class="progress-label">Worker 2</div>
+                        <div class="progress-bar">
+                            <div id="progress-fill-1" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div id="progress-text-1" class="progress-text">0%</div>
+                    </div>
+
+                    <!-- Worker 3 -->
+                    <div class="worker-progress">
+                        <div class="progress-label">Worker 3</div>
+                        <div class="progress-bar">
+                            <div id="progress-fill-2" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div id="progress-text-2" class="progress-text">0%</div>
+                    </div>
+
+                    <!-- Worker 4 -->
+                    <div class="worker-progress">
+                        <div class="progress-label">Worker 4</div>
+                        <div class="progress-bar">
+                            <div id="progress-fill-3" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div id="progress-text-3" class="progress-text">0%</div>
+                    </div>
+
+                    <!-- Additional workers can be shown/hidden via JavaScript -->
+                </div>
+
+                <!-- Total progress bar -->
+                <div class="worker-progress total-progress">
+                    <div class="progress-label">Total</div>
+                    <div class="progress-bar">
+                        <div id="total-progress-fill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="total-progress-text" class="progress-text">0%</div>
+                </div>
+            </div>
         </div>
 
         <div class="canvas-container">
